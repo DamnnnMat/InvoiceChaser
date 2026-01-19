@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2023-10-16',
 })
 
 export async function POST(request: NextRequest) {
@@ -31,16 +31,26 @@ export async function POST(request: NextRequest) {
       const customerId = session.customer as string
 
       const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-      const userId = subscription.metadata.user_id || 
-        (await stripe.customers.retrieve(customerId as string)).metadata.user_id
+      let userId = subscription.metadata.user_id
+      
+      if (!userId) {
+        // Try to get from customer metadata
+        const customer = await stripe.customers.retrieve(customerId as string)
+        if (!customer.deleted && customer.metadata?.user_id) {
+          userId = customer.metadata.user_id
+        }
+      }
 
       if (!userId) {
         // Try to find user by email
         const customer = await stripe.customers.retrieve(customerId as string)
+        if (customer.deleted || !customer.email) {
+          throw new Error('Could not identify user')
+        }
         const { data: profile } = await adminSupabase
           .from('profiles')
           .select('id')
-          .eq('email', (customer as Stripe.Customer).email)
+          .eq('email', customer.email)
           .single()
 
         if (!profile) {
