@@ -112,8 +112,10 @@ export async function POST(request: NextRequest) {
 
       console.log('Email sent successfully:', {
         to: invoice.client_email,
+        from: process.env.EMAIL_FROM,
         trackingId,
         resendId: emailResult.data?.id,
+        resendResponse: emailResult,
       })
 
       return NextResponse.json({ 
@@ -122,20 +124,28 @@ export async function POST(request: NextRequest) {
         trackingId, // Include for debugging
       })
     } catch (emailError: any) {
-      console.error('Email send error:', emailError)
+      console.error('Email send error:', {
+        message: emailError.message,
+        name: emailError.name,
+        stack: emailError.stack,
+        fullError: JSON.stringify(emailError, null, 2),
+      })
+      
+      const errorMessage = emailError.message || emailError.toString() || 'Unknown error'
       
       // Log failed reminder
       await adminSupabase.from('reminders').insert({
         invoice_id: invoice.id,
         reminder_type,
         status: 'failed',
-        error_message: emailError.message || String(emailError),
+        error_message: errorMessage,
       })
 
       return NextResponse.json(
         { 
-          error: emailError.message || 'Failed to send email',
+          error: errorMessage,
           details: emailError.toString(),
+          resendError: emailError.response?.data || emailError,
         },
         { status: 500 }
       )
