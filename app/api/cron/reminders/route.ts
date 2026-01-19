@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
+// Initialize Resend lazily to avoid build-time errors
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  return new Resend(apiKey)
+}
 
 // This endpoint should be called by a cron job (e.g., Vercel Cron, GitHub Actions, etc.)
 // It checks for unpaid invoices and sends reminders
@@ -116,6 +123,7 @@ export async function GET(request: NextRequest) {
             // Convert text body to HTML and append tracking pixel
             const htmlBody = body.replace(/\n/g, '<br/>') + trackingPixel
 
+            const resend = getResend()
             await resend.emails.send({
               from: process.env.EMAIL_FROM!,
               to: invoice.client_email,
@@ -159,6 +167,7 @@ export async function GET(request: NextRequest) {
             // Convert text body to HTML and append tracking pixel
             const htmlBody = body.replace(/\n/g, '<br/>') + trackingPixel
 
+            const resend = getResend()
             await resend.emails.send({
               from: process.env.EMAIL_FROM!,
               to: invoice.client_email,

@@ -3,7 +3,14 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
+// Initialize Resend lazily to avoid build-time errors
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  return new Resend(apiKey)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -86,6 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Send email
     try {
+      const resend = getResend()
       const emailResult = await resend.emails.send({
         from: process.env.EMAIL_FROM!,
         to: invoice.client_email,
