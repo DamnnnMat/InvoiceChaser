@@ -110,6 +110,11 @@ export async function POST(request: NextRequest) {
         html: htmlBody,
       })
 
+      // Check for Resend API errors (Resend SDK doesn't throw, it returns errors in response)
+      if (emailResult.error) {
+        throw new Error(`Resend API error: ${emailResult.error.message || JSON.stringify(emailResult.error)}`)
+      }
+
       // Check if Resend actually accepted the email
       if (!emailResult.data || !emailResult.data.id) {
         throw new Error(`Resend API returned success but no email ID. Response: ${JSON.stringify(emailResult)}`)

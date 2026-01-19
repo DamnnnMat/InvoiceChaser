@@ -124,13 +124,22 @@ export async function GET(request: NextRequest) {
             const htmlBody = body.replace(/\n/g, '<br/>') + trackingPixel
 
             const resend = getResend()
-            await resend.emails.send({
+            const emailResult = await resend.emails.send({
               from: process.env.EMAIL_FROM!,
               to: invoice.client_email,
               subject,
               text: body,
               html: htmlBody,
             })
+
+            // Check for Resend API errors
+            if (emailResult.error) {
+              throw new Error(`Resend API error: ${emailResult.error.message || JSON.stringify(emailResult.error)}`)
+            }
+
+            if (!emailResult.data || !emailResult.data.id) {
+              throw new Error(`Resend API returned success but no email ID. Response: ${JSON.stringify(emailResult)}`)
+            }
 
             // Log reminder with tracking_id
             await adminSupabase.from('reminders').insert({
@@ -168,13 +177,22 @@ export async function GET(request: NextRequest) {
             const htmlBody = body.replace(/\n/g, '<br/>') + trackingPixel
 
             const resend = getResend()
-            await resend.emails.send({
+            const emailResult = await resend.emails.send({
               from: process.env.EMAIL_FROM!,
               to: invoice.client_email,
               subject,
               text: body,
               html: htmlBody,
             })
+
+            // Check for Resend API errors
+            if (emailResult.error) {
+              throw new Error(`Resend API error: ${emailResult.error.message || JSON.stringify(emailResult.error)}`)
+            }
+
+            if (!emailResult.data || !emailResult.data.id) {
+              throw new Error(`Resend API returned success but no email ID. Response: ${JSON.stringify(emailResult)}`)
+            }
 
             // Log reminder with tracking_id
             await adminSupabase.from('reminders').insert({
