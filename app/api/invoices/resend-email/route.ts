@@ -102,6 +102,11 @@ export async function POST(request: NextRequest) {
         html: htmlBody,
       })
 
+      // Check if Resend actually accepted the email
+      if (!emailResult.data || !emailResult.data.id) {
+        throw new Error(`Resend API returned success but no email ID. Response: ${JSON.stringify(emailResult)}`)
+      }
+
       // Log reminder with tracking_id
       await adminSupabase.from('reminders').insert({
         invoice_id: invoice.id,
@@ -114,8 +119,8 @@ export async function POST(request: NextRequest) {
         to: invoice.client_email,
         from: process.env.EMAIL_FROM,
         trackingId,
-        resendId: emailResult.data?.id,
-        resendResponse: emailResult,
+        resendId: emailResult.data.id,
+        resendResponse: JSON.stringify(emailResult, null, 2),
       })
 
       return NextResponse.json({ 
