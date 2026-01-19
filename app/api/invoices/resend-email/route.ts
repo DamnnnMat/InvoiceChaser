@@ -9,6 +9,14 @@ function getResend() {
   if (!apiKey) {
     throw new Error('RESEND_API_KEY is not configured')
   }
+  if (apiKey === 're_placeholder' || apiKey.includes('placeholder')) {
+    throw new Error('RESEND_API_KEY is still set to placeholder value')
+  }
+  console.log('Resend API Key check:', {
+    hasKey: !!apiKey,
+    keyPrefix: apiKey?.substring(0, 10),
+    keyLength: apiKey?.length,
+  })
   return new Resend(apiKey)
 }
 
