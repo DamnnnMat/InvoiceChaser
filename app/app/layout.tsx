@@ -30,7 +30,7 @@ export default async function AppLayout({
   // Get subscription for trial banner
   const { data: subscription } = await adminSupabase
     .from('subscriptions')
-    .select('status')
+    .select('status, current_period_end')
     .eq('user_id', user.id)
     .single()
 

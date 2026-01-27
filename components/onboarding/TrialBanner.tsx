@@ -10,7 +10,7 @@ import { checkUserAccess } from '@/lib/subscription'
 
 interface TrialBannerProps {
   trialEndsAt: string | null
-  subscription: { status: string } | null
+  subscription: { status: string; current_period_end: string | null } | null
 }
 
 export default function TrialBanner({ trialEndsAt, subscription }: TrialBannerProps) {

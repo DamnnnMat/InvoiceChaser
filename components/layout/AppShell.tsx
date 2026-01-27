@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 
 interface Subscription {
   status: string
+  current_period_end: string | null
 }
 
 export default function AppShell({ 
