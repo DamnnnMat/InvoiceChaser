@@ -35,6 +35,7 @@ interface Reminder {
   is_manual: boolean
   template_id: string | null
   template_type: string | null
+  tracking_id: string | null
   template?: Template | null
 }
 

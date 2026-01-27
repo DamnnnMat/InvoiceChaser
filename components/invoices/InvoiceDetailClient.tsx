@@ -31,6 +31,10 @@ interface Reminder {
   error_message: string | null
   opened_at: string | null
   open_count: number
+  tracking_id: string | null
+  is_manual: boolean
+  template_id: string | null
+  template_type: string | null
 }
 
 interface Payment {
