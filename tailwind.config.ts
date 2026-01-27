@@ -67,10 +67,45 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "float-1": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-20px)" },
+        },
+        "float-2": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-15px)" },
+        },
+        "float-3": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-25px)" },
+        },
+        "float-4": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-18px)" },
+        },
+        "float-5": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-22px)" },
+        },
+        "marquee": {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "flicker": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "float-1": "float-1 6s ease-in-out infinite",
+        "float-2": "float-2 8s ease-in-out infinite",
+        "float-3": "float-3 7s ease-in-out infinite",
+        "float-4": "float-4 9s ease-in-out infinite",
+        "float-5": "float-5 6.5s ease-in-out infinite",
+        "marquee": "marquee 30s linear infinite",
+        "flicker": "flicker 2s ease-in-out infinite",
       },
     },
   },

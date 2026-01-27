@@ -42,14 +42,25 @@ interface Reminder {
   } | any
 }
 
+interface AccessInfo {
+  hasAccess: boolean
+  isTrial: boolean
+  isActiveSubscription: boolean
+  trialEndsAt: string | null
+  daysRemaining: number | null
+  isExpired: boolean
+}
+
 export default function DashboardClient({
   invoices,
   reminders,
-  hasSubscription,
+  hasAccess,
+  accessInfo,
 }: {
   invoices: Invoice[]
   reminders: Reminder[]
-  hasSubscription: boolean
+  hasAccess: boolean
+  accessInfo?: AccessInfo
 }) {
   const router = useRouter()
 
@@ -132,19 +143,20 @@ export default function DashboardClient({
     return labels[type] || type
   }
 
-  if (!hasSubscription) {
+  if (!hasAccess) {
     return (
       <div className="p-6">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
-              <p className="text-slate-600">
-                Active subscription required. Please subscribe in{' '}
-                <a href="/app/billing" className="text-primary hover:underline">
-                  Billing
-                </a>
-                .
+              <p className="text-slate-600 mb-4">
+                {accessInfo?.isExpired 
+                  ? 'Your trial has expired. Subscribe to continue using InvoiceSeen.'
+                  : 'Active subscription or trial required. Please subscribe in'}
               </p>
+              <Button asChild>
+                <a href="/app/billing">Go to Billing</a>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -157,6 +169,7 @@ export default function DashboardClient({
       <PageHeader
         title="Dashboard"
         description="Monitor your invoices, track payments, and manage reminders—all in one place."
+        data-walkthrough="dashboard-header"
         action={
           <Button onClick={() => router.push('/app/invoices')}>
             <Plus className="h-4 w-4 mr-2" />

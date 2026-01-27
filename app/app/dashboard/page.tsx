@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserAccess } from '@/lib/subscription-server'
 import DashboardClient from '@/components/dashboard/DashboardClient'
 
 export default async function DashboardPage() {
@@ -15,13 +16,8 @@ export default async function DashboardPage() {
 
   const adminSupabase = createAdminClient()
 
-  // Check subscription
-  const { data: subscription } = await adminSupabase
-    .from('subscriptions')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .single()
+  // Check access (trial or subscription)
+  const access = await getUserAccess(adminSupabase, user.id)
 
   // Get invoices
   const { data: invoices } = await adminSupabase
@@ -51,7 +47,8 @@ export default async function DashboardPage() {
     <DashboardClient
       invoices={invoices || []}
       reminders={reminders || []}
-      hasSubscription={!!subscription}
+      hasAccess={access.hasAccess}
+      accessInfo={access}
     />
   )
 }

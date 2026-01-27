@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, X, CreditCard, CheckCircle2 } from 'lucide-react'
+import { Check, X, CreditCard, CheckCircle2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import PageHeader from '@/components/layout/PageHeader'
+import { checkUserAccess } from '@/lib/subscription'
+import { formatDistanceToNow } from 'date-fns'
 
 interface Subscription {
   id: string
@@ -18,15 +20,19 @@ interface Subscription {
 export default function BillingClient({
   userId,
   subscription,
+  trialEndsAt,
 }: {
   userId: string
   subscription: Subscription | null
+  trialEndsAt: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const success = searchParams.get('success')
   const canceled = searchParams.get('canceled')
   const [loading, setLoading] = useState(false)
+
+  const access = checkUserAccess(trialEndsAt, subscription)
 
   useEffect(() => {
     if (success) {
@@ -104,7 +110,7 @@ export default function BillingClient({
             {/* Plan Details */}
             <div className="space-y-4">
               <div>
-                <h3 className="text-2xl font-semibold text-slate-900">Invoice Chaser Pro</h3>
+                <h3 className="text-2xl font-semibold text-slate-900">InvoiceSeen Pro</h3>
                 <div className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-bold text-primary">£9</span>
                   <span className="text-slate-600">/month</span>
@@ -126,8 +132,58 @@ export default function BillingClient({
               </ul>
             </div>
 
+            {/* Trial Status */}
+            {access.isTrial && !access.isExpired && (
+              <div className="space-y-4 border-t border-slate-200 pt-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                    <span className="font-semibold text-blue-900">Free Trial Active</span>
+                    <Badge variant="secondary" className="ml-auto">
+                      {access.daysRemaining} {access.daysRemaining === 1 ? 'day' : 'days'} left
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-blue-700 mb-4">
+                    Your trial ends {formatDistanceToNow(new Date(access.trialEndsAt!), { addSuffix: true })}.
+                    Subscribe now to continue using InvoiceSeen after your trial.
+                  </p>
+                  <Button
+                    onClick={handleSubscribe}
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    size="lg"
+                  >
+                    {loading ? 'Loading...' : 'Subscribe Now - £9/month'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Trial Expired */}
+            {access.isTrial && access.isExpired && (
+              <div className="space-y-4 border-t border-slate-200 pt-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <X className="h-5 w-5 text-red-600" />
+                    <span className="font-semibold text-red-900">Trial Expired</span>
+                  </div>
+                  <p className="text-sm text-red-700 mb-4">
+                    Your free trial has ended. Subscribe now to continue using InvoiceSeen and keep access to your data.
+                  </p>
+                  <Button
+                    onClick={handleSubscribe}
+                    disabled={loading}
+                    className="w-full bg-red-600 hover:bg-red-700"
+                    size="lg"
+                  >
+                    {loading ? 'Loading...' : 'Subscribe Now - £9/month'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Subscription Status */}
-            {subscription ? (
+            {access.isActiveSubscription && subscription && (
               <div className="space-y-4 border-t border-slate-200 pt-6">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-600">Status</span>
@@ -143,17 +199,11 @@ export default function BillingClient({
                     </span>
                   </div>
                 )}
-                {subscription.status !== 'active' && (
-                  <Button
-                    onClick={handleSubscribe}
-                    disabled={loading}
-                    className="w-full mt-4"
-                  >
-                    {loading ? 'Loading...' : 'Subscribe Now'}
-                  </Button>
-                )}
               </div>
-            ) : (
+            )}
+
+            {/* No Trial, No Subscription */}
+            {!access.hasAccess && !access.isTrial && (
               <div className="border-t border-slate-200 pt-6">
                 <p className="text-sm text-slate-600 mb-4">
                   You don't have an active subscription.

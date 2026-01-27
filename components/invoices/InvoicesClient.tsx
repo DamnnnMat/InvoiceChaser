@@ -3,12 +3,13 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { Plus, Search, Filter, MoreVertical, Mail, Eye, CheckCircle2, AlertCircle, DollarSign } from 'lucide-react'
+import { Plus, Search, Filter, MoreVertical, Mail, Eye, CheckCircle2, AlertCircle, DollarSign, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import PageHeader from '@/components/layout/PageHeader'
 import InvoiceForm from './InvoiceForm'
+import CSVImportDialog from './CSVImportDialog'
 import {
   Dialog,
   DialogContent,
@@ -36,27 +38,129 @@ interface Invoice {
   due_date: string
   is_paid: boolean
   created_at: string
+  behaviorData?: {
+    hasReminders: boolean
+    hasOpens: boolean
+    lastOpenedAt: string | null
+    totalOpenCount: number
+  }
+}
+
+interface AccessInfo {
+  hasAccess: boolean
+  isTrial: boolean
+  isActiveSubscription: boolean
+  trialEndsAt: string | null
+  daysRemaining: number | null
+  isExpired: boolean
+}
+
+// Behavioral Status Badge Component
+function BehavioralStatusBadge({ invoice }: { invoice: Invoice }) {
+  const getBehavioralStatus = (invoice: Invoice) => {
+    if (invoice.is_paid) {
+      return {
+        label: 'Paid',
+        variant: 'default' as const,
+        tooltip: null,
+      }
+    }
+
+    const behaviorData = invoice.behaviorData
+    const dueDate = new Date(invoice.due_date)
+    const now = new Date()
+    const isOverdue = dueDate < now
+
+    // If no reminders sent yet
+    if (!behaviorData?.hasReminders) {
+      return {
+        label: 'No reminders yet',
+        variant: 'secondary' as const,
+        tooltip: 'No reminder emails have been sent for this invoice yet.',
+      }
+    }
+
+    // If reminders sent but none opened
+    if (behaviorData.hasReminders && !behaviorData.hasOpens) {
+      return {
+        label: 'Not opened yet',
+        variant: 'secondary' as const,
+        tooltip: 'No tracked opens yet. Some email clients block images.',
+      }
+    }
+
+    // If opened
+    if (behaviorData.hasOpens) {
+      const statusLabel = isOverdue ? 'Opened · Overdue' : 'Opened · Unpaid'
+      const openCount = behaviorData.totalOpenCount
+      const openCountText = openCount > 1 ? ` (Opened ${openCount} times)` : ''
+      
+      return {
+        label: `${statusLabel}${openCountText}`,
+        variant: isOverdue ? 'destructive' as const : 'default' as const,
+        tooltip: openCount > 1 
+          ? `This reminder email has been opened ${openCount} times. Client has opened reminder emails but hasn't paid yet.`
+          : 'Client has opened reminder emails but hasn\'t paid yet.',
+      }
+    }
+
+    // Fallback to traditional status
+    return {
+      label: isOverdue ? 'Overdue' : 'Upcoming',
+      variant: isOverdue ? 'destructive' as const : 'secondary' as const,
+      tooltip: null,
+    }
+  }
+
+  const status = getBehavioralStatus(invoice)
+  
+  if (!status.tooltip) {
+    return <Badge variant={status.variant}>{status.label}</Badge>
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant={status.variant}>{status.label}</Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{status.tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 }
 
 export default function InvoicesClient({
   invoices,
-  hasSubscription,
+  hasAccess,
+  accessInfo,
 }: {
   invoices: Invoice[]
-  hasSubscription: boolean
+  hasAccess: boolean
+  accessInfo?: AccessInfo
 }) {
   const [showForm, setShowForm] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'overdue' | 'paid'>('all')
   const router = useRouter()
 
-  if (!hasSubscription) {
+  if (!hasAccess) {
     return (
       <div className="p-6">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
-              <p className="text-slate-600">Active subscription required. Please subscribe in <a href="/app/billing" className="text-primary hover:underline">Billing</a>.</p>
+              <p className="text-slate-600 mb-4">
+                {accessInfo?.isExpired 
+                  ? 'Your trial has expired. Subscribe to continue using InvoiceSeen.'
+                  : 'Active subscription or trial required. Please subscribe in'}
+              </p>
+              <Button asChild>
+                <a href="/app/billing">Go to Billing</a>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -101,13 +205,6 @@ export default function InvoicesClient({
     })
   }, [invoices, searchQuery, statusFilter])
 
-  const getStatus = (invoice: Invoice) => {
-    if (invoice.is_paid) return 'paid'
-    const dueDate = new Date(invoice.due_date)
-    const now = new Date()
-    if (dueDate < now) return 'overdue'
-    return 'upcoming'
-  }
 
   return (
     <>
@@ -115,10 +212,16 @@ export default function InvoicesClient({
         title="Invoices"
         description="Manage your invoices and track payments"
         action={
-          <Button onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Invoice
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Invoice
+            </Button>
+          </div>
         }
       />
 
@@ -211,7 +314,7 @@ export default function InvoicesClient({
         </Card>
 
         {/* Invoices Table */}
-        <Card className="border-slate-200">
+        <Card className="border-slate-200" data-walkthrough="invoices-list">
           <CardContent className="p-0">
             {filteredInvoices.length === 0 ? (
               <div className="text-center py-12">
@@ -243,10 +346,8 @@ export default function InvoicesClient({
                       </TableCell>
                       <TableCell className="font-medium">£{invoice.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(new Date(invoice.due_date), 'MMM d, yyyy')}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatus(invoice)}>
-                          {getStatus(invoice).charAt(0).toUpperCase() + getStatus(invoice).slice(1)}
-                        </Badge>
+                      <TableCell data-walkthrough="invoice-status">
+                        <BehavioralStatusBadge invoice={invoice} />
                       </TableCell>
                       <TableCell className="text-right">
                         <InvoiceActions invoice={invoice} />
@@ -267,6 +368,11 @@ export default function InvoicesClient({
           router.refresh()
         }}
         onCancel={() => setShowForm(false)}
+      />
+
+      <CSVImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
       />
     </>
   )

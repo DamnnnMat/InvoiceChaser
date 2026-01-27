@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'Invoice Chaser - Automated Invoice Reminders',
+  title: 'InvoiceSeen - Automated Invoice Reminders',
   description: 'Automatically send polite invoice reminders until payment is received',
 }
 

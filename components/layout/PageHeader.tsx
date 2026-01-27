@@ -5,13 +5,14 @@ interface PageHeaderProps {
   title: string
   description?: string
   action?: ReactNode
+  'data-walkthrough'?: string
 }
 
-export default function PageHeader({ title, description, action }: PageHeaderProps) {
+export default function PageHeader({ title, description, action, 'data-walkthrough': dataWalkthrough }: PageHeaderProps) {
   const currentDate = format(new Date(), 'EEEE, MMMM yyyy')
 
   return (
-    <div className="border-b bg-white px-8 py-6 shadow-sm">
+    <div className="border-b bg-white px-8 py-6 shadow-sm" data-walkthrough={dataWalkthrough}>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{title}</h1>
         {action && <div>{action}</div>}

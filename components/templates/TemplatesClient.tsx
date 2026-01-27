@@ -2,178 +2,279 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, Edit } from 'lucide-react'
+import { Mail, Copy, Edit, MoreVertical, Calendar, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import PageHeader from '@/components/layout/PageHeader'
+import { format } from 'date-fns'
+import ViewTemplateDialog from './ViewTemplateDialog'
+import WorkflowConfig from './WorkflowConfig'
 
-interface Template {
+interface TemplateVersion {
   id: string
-  template_type: string
+  name: string | null
   subject: string
   body: string
+  is_active: boolean
   created_at: string
   updated_at: string
 }
 
-export default function TemplatesClient({ templates }: { templates: Template[] }) {
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
-  const [editData, setEditData] = useState<{ subject: string; body: string } | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+interface Template {
+  id: string
+  user_id: string | null
+  slug: string | null
+  name: string
+  tone: string
+  description: string | null
+  is_system: boolean
+  created_at: string
+  active_version: TemplateVersion
+  reminder_type?: string | null
+  workflow_order?: number | null
+}
+
+export default function TemplatesClient({
+  systemTemplates,
+  userTemplates,
+}: {
+  systemTemplates: Template[]
+  userTemplates: Template[]
+}) {
   const router = useRouter()
+  const [viewTemplate, setViewTemplate] = useState<Template | null>(null)
 
-  const startEdit = (template: Template) => {
-    setEditingTemplate(template)
-    setEditData({ subject: template.subject, body: template.body })
-    setError('')
+  const getToneBadgeVariant = (tone: string) => {
+    const variants: { [key: string]: string } = {
+      friendly: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      neutral: 'bg-green-100 text-green-700 border-green-200',
+      polite: 'bg-amber-100 text-amber-700 border-amber-200',
+      firm: 'bg-orange-100 text-orange-700 border-orange-200',
+      final: 'bg-red-100 text-red-700 border-red-200',
+      partial: 'bg-blue-100 text-blue-700 border-blue-200',
+    }
+    return variants[tone] || 'bg-slate-100 text-slate-700 border-slate-200'
   }
 
-  const cancelEdit = () => {
-    setEditingTemplate(null)
-    setEditData(null)
-    setError('')
-  }
-
-  const saveTemplate = async () => {
-    if (!editData || !editingTemplate) return
-
-    setLoading(true)
-    setError('')
+  const handleClone = async (templateId: string) => {
     try {
-      const response = await fetch(`/api/templates/${editingTemplate.template_type}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editData),
+      const response = await fetch(`/api/templates/${templateId}/clone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to save template')
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Non-JSON response:', text.substring(0, 200))
+        throw new Error('Server returned an error. Please check the console for details.')
       }
 
-      cancelEdit()
-      router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save template')
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to clone template')
+      }
 
-  const getTemplateLabel = (type: string) => {
-    const labels: { [key: string]: string } = {
-      friendly: 'Friendly Reminder',
-      firm: 'Firm Reminder',
-      final: 'Final Notice',
+      const data = await response.json()
+      // Redirect to edit page for the cloned template
+      if (data.template?.id) {
+        // Use window.location for a full page reload to ensure fresh data
+        window.location.href = `/app/templates/${data.template.id}/edit`
+      } else {
+        router.refresh()
+      }
+    } catch (error: any) {
+      console.error('Failed to clone template:', error)
+      alert(error.message || 'Failed to clone template. Please try again.')
     }
-    return labels[type] || type
-  }
-
-  const getTemplateDescription = (type: string) => {
-    const descriptions: { [key: string]: string } = {
-      friendly: 'Sent 3 days before the due date',
-      firm: 'Sent on the due date',
-      final: 'Sent after the due date, then weekly',
-    }
-    return descriptions[type] || ''
   }
 
   return (
     <>
       <PageHeader
-        title="Email Templates"
-        description="Customize your invoice reminder emails. Use {'{client_name}'}, {'{amount}'}, and {'{due_date}'} as placeholders."
+        title="Templates"
+        description="Pick a proven template or create your own reminder email for unpaid invoices."
+        action={
+          <Button onClick={() => router.push('/app/templates/new')}>
+            + New template
+          </Button>
+        }
+        data-walkthrough="templates"
       />
 
-      <div className="p-8">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {templates.map((template) => (
-            <Card key={template.id} className="border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{getTemplateLabel(template.template_type)}</CardTitle>
-                    <CardDescription className="mt-1">{getTemplateDescription(template.template_type)}</CardDescription>
+      <div className="p-8" data-walkthrough="templates">
+        <p className="text-sm text-slate-600 mb-6">
+          These templates are designed to increase open and payment response rates based on common invoicing behaviour.
+        </p>
+        <Tabs defaultValue="system" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="system">InvoiceSeen templates</TabsTrigger>
+            <TabsTrigger value="user">Your templates</TabsTrigger>
+          </TabsList>
+
+          {/* System Templates Tab */}
+          <TabsContent value="system" className="space-y-4">
+            {systemTemplates.map((template) => (
+              <Card key={template.id} className="border-slate-200 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge className={getToneBadgeVariant(template.tone)}>
+                          {template.tone.charAt(0).toUpperCase() + template.tone.slice(1)}
+                        </Badge>
+                        <h3 className="text-lg font-semibold">{template.name}</h3>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs">
+                                ⭐ Proven template
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Used by most InvoiceSeen users.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <p className="text-sm text-slate-600">{template.description}</p>
+                      {template.active_version?.subject && (
+                        <p className="text-xs text-slate-500 mt-2">
+                          Subject: {template.active_version.subject}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setViewTemplate(template)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleClone(template.id)}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Clone
+                      </Button>
+                    </div>
                   </div>
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-xs text-slate-500">Subject</Label>
-                  <p className="mt-1 text-sm font-medium">{template.subject}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-slate-500">Body</Label>
-                  <p className="mt-1 text-sm text-slate-600 whitespace-pre-wrap line-clamp-3">{template.body}</p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => startEdit(template)}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Template
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          {/* User Templates Tab */}
+          <TabsContent value="user" className="space-y-4">
+            {/* Workflow Configuration */}
+            {userTemplates.length > 0 && <WorkflowConfig userTemplates={userTemplates} />}
+
+            {userTemplates.length === 0 ? (
+              <Card className="border-slate-200">
+                <CardContent className="p-12 text-center">
+                  <Mail className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-600 mb-2">No custom templates yet.</p>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Clone a system template or create a new one to get started.
+                  </p>
+                  <Button onClick={() => router.push('/app/templates/new')}>
+                    Create your first template
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              userTemplates.map((template) => (
+                <Card key={template.id} className="border-slate-200 shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-3">
+                          {template.reminder_type && (
+                            <Badge variant="default" className="bg-blue-600 text-white">
+                              Active in workflow
+                            </Badge>
+                          )}
+                          <h3 className="text-lg font-semibold">{template.name}</h3>
+                          <Badge variant="outline" className={getToneBadgeVariant(template.tone)}>
+                            {template.tone.charAt(0).toUpperCase() + template.tone.slice(1)}
+                          </Badge>
+                          {template.reminder_type && (
+                            <Badge variant="secondary" className="text-xs">
+                              {template.reminder_type.replace('_', ' ')}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600">
+                          Last edited {format(new Date(template.active_version.updated_at), 'd MMM, yyyy')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => router.push(`/app/templates/${template.id}/edit`)}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => router.push(`/app/templates/${template.id}/versions`)}
+                        >
+                          Versions
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={async () => {
+                                if (confirm('Are you sure you want to delete this template?')) {
+                                  try {
+                                    await fetch(`/api/templates/${template.id}`, { method: 'DELETE' })
+                                    router.refresh()
+                                  } catch (error) {
+                                    console.error('Failed to delete template:', error)
+                                  }
+                                }
+                              }}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingTemplate} onOpenChange={cancelEdit}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Edit {editingTemplate && getTemplateLabel(editingTemplate.template_type)}
-            </DialogTitle>
-            <DialogDescription>
-              Use {'{client_name}'}, {'{amount}'}, and {'{due_date}'} as placeholders in your template.
-            </DialogDescription>
-          </DialogHeader>
-          {editingTemplate && editData && (
-            <div className="space-y-4 py-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject</Label>
-                <Input
-                  id="subject"
-                  value={editData.subject}
-                  onChange={(e) => setEditData({ ...editData, subject: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="body">Body</Label>
-                <Textarea
-                  id="body"
-                  value={editData.body}
-                  onChange={(e) => setEditData({ ...editData, body: e.target.value })}
-                  rows={8}
-                  className="font-mono text-sm"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={cancelEdit}>
-              Cancel
-            </Button>
-            <Button onClick={saveTemplate} disabled={loading || !editData}>
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ViewTemplateDialog
+        template={viewTemplate}
+        open={viewTemplate !== null}
+        onOpenChange={(open) => !open && setViewTemplate(null)}
+      />
     </>
   )
 }

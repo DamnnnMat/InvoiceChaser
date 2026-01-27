@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'gbp',
             product_data: {
-              name: 'Invoice Chaser Pro',
+              name: 'InvoiceSeen Pro',
             },
             unit_amount: 900, // £9.00
             recurring: {

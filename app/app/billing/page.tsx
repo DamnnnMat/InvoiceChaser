@@ -13,7 +13,7 @@ export default async function BillingPage() {
     redirect('/login')
   }
 
-  // Check subscription status
+  // Check subscription status and trial
   const adminSupabase = createAdminClient()
   const { data: subscription } = await adminSupabase
     .from('subscriptions')
@@ -21,5 +21,18 @@ export default async function BillingPage() {
     .eq('user_id', user.id)
     .single()
 
-  return <BillingClient userId={user.id} subscription={subscription} />
+  // Get user profile for trial info
+  const { data: profile } = await adminSupabase
+    .from('profiles')
+    .select('trial_started_at, trial_ends_at')
+    .eq('id', user.id)
+    .single()
+
+  return (
+    <BillingClient
+      userId={user.id}
+      subscription={subscription}
+      trialEndsAt={profile?.trial_ends_at || null}
+    />
+  )
 }

@@ -82,7 +82,7 @@ export default function BillingClient({
       <div className="card">
         <h2>Subscription Plan</h2>
         <div className="plan-details">
-          <div className="plan-name">Invoice Chaser Pro</div>
+          <div className="plan-name">InvoiceSeen Pro</div>
           <div className="plan-price">£9<span>/month</span></div>
           <ul className="plan-features">
             <li>Unlimited invoices</li>

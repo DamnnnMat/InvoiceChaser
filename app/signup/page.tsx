@@ -15,7 +15,7 @@ export default async function SignupPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Invoice Chaser</h1>
+        <h1>InvoiceSeen</h1>
         <h2>Sign Up</h2>
         <SignupForm />
       </div>

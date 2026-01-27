@@ -68,9 +68,9 @@ export default function ResendEmailDialog({ invoice }: { invoice: Invoice }) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)} className="flex items-center gap-2">
+      <Button onClick={() => setOpen(true)} className="flex items-center gap-2">
         <Mail className="h-4 w-4" />
-        Resend Email
+        Send new reminder
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

@@ -32,3 +32,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large media files and old projects
+Home V2/
+*.mp4
+*.mov
+*.avi

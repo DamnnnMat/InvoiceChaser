@@ -18,8 +18,23 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import TrialBanner from '@/components/onboarding/TrialBanner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+interface Subscription {
+  status: string
+}
+
+export default function AppShell({ 
+  children,
+  trialEndsAt,
+  subscription,
+}: { 
+  children: React.ReactNode
+  trialEndsAt: string | null
+  subscription: Subscription | null
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -41,6 +56,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Beta Ribbon Banner */}
+      <div className="w-full bg-slate-100 border-b border-slate-200 text-slate-700 text-center py-1.5 px-4 text-xs font-normal">
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-slate-600">🧪 We're in Beta — Your feedback helps us improve!</span>
+          <Link 
+            href="/app/feedback" 
+            className="text-slate-700 hover:text-slate-900 underline font-medium transition-colors"
+          >
+            Share feedback
+          </Link>
+        </div>
+      </div>
+      
       {/* Mobile Header */}
       <div className="lg:hidden border-b bg-white sticky top-0 z-40 shadow-sm">
         <div className="flex items-center justify-between px-4 h-16">
@@ -48,7 +76,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
               <FileText className="h-5 w-5 text-white" />
             </div>
-            <span className="font-semibold text-lg text-slate-900">Invoice Chaser</span>
+            <span className="font-semibold text-lg text-slate-900">InvoiceSeen</span>
           </div>
           <Button
             variant="ghost"
@@ -63,7 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Dark Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed top-[33px] bottom-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -74,7 +102,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <FileText className="h-6 w-6 text-white" />
             </div>
             <div>
-              <span className="font-bold text-lg text-white">Invoice Chaser</span>
+              <span className="font-bold text-lg text-white">InvoiceSeen</span>
               <p className="text-xs text-slate-400">Payment Operations</p>
             </div>
           </div>
@@ -120,6 +148,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* User Profile & Logout */}
           <div className="p-4 border-t border-slate-800 space-y-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-full flex items-center justify-center py-2">
+                    <Badge variant="outline" className="bg-slate-800 border-slate-700 text-slate-300 text-xs">
+                      🧪 Beta — feedback welcome
+                    </Badge>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>We're actively improving InvoiceSeen. Your feedback helps shape the product.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button
               variant="ghost"
               className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800"
@@ -141,7 +183,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main Content */}
-      <main className="lg:pl-72">
+      <main className="lg:pl-72 pt-[33px]">
+        <TrialBanner trialEndsAt={trialEndsAt} subscription={subscription} />
         <div className="min-h-screen">
           {children}
         </div>

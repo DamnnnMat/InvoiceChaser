@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
+import { getTemplateForReminder } from '@/lib/templates'
 
 // Initialize Resend lazily to avoid build-time errors
 function getResend() {
@@ -52,45 +53,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot send reminders for paid invoices' }, { status: 400 })
     }
 
-    // Get template
-    const templateType = reminder_type === 'before_due' ? 'friendly' : 
-                        reminder_type === 'on_due' ? 'firm' : 'final'
-
-    const { data: template } = await adminSupabase
-      .from('email_templates')
+    // Get template using new system
+    const emailTemplate = await getTemplateForReminder(adminSupabase, user.id, reminder_type)
+    const dueDate = new Date(invoice.due_date)
+    
+    // Get payments for outstanding amount calculation
+    const { data: payments } = await adminSupabase
+      .from('invoice_payments')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('template_type', templateType)
-      .single()
+      .eq('invoice_id', invoice.id)
+    
+    const totalPaid = payments?.reduce((sum, p) => sum + (p.amount_cents || 0), 0) || 0
+    const invoiceAmountCents = Math.round(invoice.amount * 100)
+    const outstandingCents = invoiceAmountCents - totalPaid
+    const outstanding = (outstandingCents / 100).toFixed(2)
+    const paidAmount = (totalPaid / 100).toFixed(2)
 
-    // Use default if no template
-    const defaults: { [key: string]: { subject: string; body: string } } = {
-      friendly: {
-        subject: 'Friendly Reminder: Invoice Payment Due',
-        body: 'Hi {client_name}, Just a friendly reminder that your invoice for £{amount} is due on {due_date}. Thank you!',
-      },
-      firm: {
-        subject: 'Reminder: Invoice Payment Overdue',
-        body: 'Hi {client_name}, This is a reminder that your invoice for £{amount} was due on {due_date} and is now overdue. Please arrange payment as soon as possible.',
-      },
-      final: {
-        subject: 'Final Notice: Urgent Payment Required',
-        body: 'Hi {client_name}, This is a final notice regarding your overdue invoice for £{amount}, which was due on {due_date}. Please make payment immediately to avoid further action.',
-      },
+    // Replace all variables
+    const replacements: { [key: string]: string } = {
+      '{client_name}': invoice.client_name,
+      '{client_email}': invoice.client_email,
+      '{invoice_number}': invoice.id.substring(0, 8).toUpperCase(),
+      '{amount}': invoice.amount.toFixed(2),
+      '{due_date}': dueDate.toLocaleDateString(),
+      '{outstanding_amount}': outstanding,
+      '{paid_amount}': paidAmount,
+      '{final_date}': new Date(dueDate.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      '{sender_name}': user.email?.split('@')[0] || 'Team',
     }
 
-    const emailTemplate = template || defaults[templateType]
-    const dueDate = new Date(invoice.due_date)
+    let subject = emailTemplate.subject
+    let emailBody = emailTemplate.body
 
-    const subject = emailTemplate.subject
-      .replace('{client_name}', invoice.client_name)
-      .replace('{amount}', invoice.amount.toString())
-      .replace('{due_date}', dueDate.toLocaleDateString())
-
-    const emailBody = emailTemplate.body
-      .replace('{client_name}', invoice.client_name)
-      .replace('{amount}', invoice.amount.toString())
-      .replace('{due_date}', dueDate.toLocaleDateString())
+    Object.entries(replacements).forEach(([key, value]) => {
+      subject = subject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+      emailBody = emailBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+    })
 
     // Generate tracking_id before sending
     const trackingId = crypto.randomUUID()
@@ -120,12 +118,15 @@ export async function POST(request: NextRequest) {
         throw new Error(`Resend API returned success but no email ID. Response: ${JSON.stringify(emailResult)}`)
       }
 
-      // Log reminder with tracking_id
+      // Log reminder with tracking_id and metadata
       await adminSupabase.from('reminders').insert({
         invoice_id: invoice.id,
         reminder_type,
         status: 'sent',
         tracking_id: trackingId,
+        is_manual: true, // Manual resend
+        template_id: emailTemplate.template_id || null,
+        template_type: emailTemplate.template_type,
       })
 
       console.log('Email sent successfully:', {
@@ -151,12 +152,15 @@ export async function POST(request: NextRequest) {
       
       const errorMessage = emailError.message || emailError.toString() || 'Unknown error'
       
-      // Log failed reminder
+      // Log failed reminder with metadata
       await adminSupabase.from('reminders').insert({
         invoice_id: invoice.id,
         reminder_type,
         status: 'failed',
         error_message: errorMessage,
+        is_manual: true, // Manual resend
+        template_id: emailTemplate.template_id || null,
+        template_type: emailTemplate.template_type,
       })
 
       return NextResponse.json(

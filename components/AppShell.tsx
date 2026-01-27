@@ -26,7 +26,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <nav className="navbar">
-        <div className="nav-brand">Invoice Chaser</div>
+        <div className="nav-brand">InvoiceSeen</div>
         <div className="nav-links">
           {navItems.map((item) => (
             <Link
