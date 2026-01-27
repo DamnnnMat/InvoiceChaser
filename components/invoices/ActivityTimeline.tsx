@@ -19,6 +19,7 @@ export type TimelineEvent = {
     open_count?: number
     note?: string
     reminder_type?: string
+    first_opened_at?: string
   }
   status?: 'success' | 'warning' | 'error' | 'info'
 }
