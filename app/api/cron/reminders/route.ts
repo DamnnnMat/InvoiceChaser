@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       const daysUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       const daysOverdue = daysUntilDue < 0 ? Math.abs(daysUntilDue) : 0
 
-      let reminderType: string | null = null
+      let reminderType: 'before_due' | 'on_due' | 'after_due' | null = null
       let shouldSend = false
 
       // Before due date: 3 days before
