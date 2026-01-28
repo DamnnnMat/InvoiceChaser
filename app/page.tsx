@@ -97,14 +97,14 @@ export default function LandingPage() {
                   <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10"></div>
                   <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10"></div>
                   
-                  {/* Scrolling content */}
+                  {/* Scrolling content - companies testing the platform */}
                   <div className="overflow-hidden relative">
                     <div className="flex whitespace-nowrap animate-marquee">
                       {[...Array(2)].flatMap((_, i) => (
-                        ['Design Studios', 'Consulting Firms', 'Agencies', 'Freelancers', 'SaaS Companies', 'Service Providers'].map((company) => (
+                        ['Corespace', 'Profiled.io', 'Acorn Accountants', 'Quantax'].map((company) => (
                           <span 
                             key={`${company}-${i}`} 
-                            className="inline-block mx-4 text-xl font-semibold tracking-tight text-muted-foreground/50"
+                            className="inline-block mx-6 text-xl font-semibold tracking-tight text-muted-foreground/60"
                           >
                             {company}
                           </span>
