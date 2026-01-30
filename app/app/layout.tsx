@@ -19,8 +19,23 @@ export default async function AppLayout({
     redirect('/login')
   }
 
-  // Get walkthrough status and trial info
   const adminSupabase = createAdminClient()
+
+  // Private beta: only allowlisted emails can access the app
+  const email = user.email?.trim().toLowerCase()
+  if (email) {
+    const { data: allowlistRow } = await adminSupabase
+      .from('beta_allowlist')
+      .select('email')
+      .eq('email', email)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (!allowlistRow) {
+      redirect('/private-beta')
+    }
+  }
+
+  // Get walkthrough status and trial info
   const { data: profile } = await adminSupabase
     .from('profiles')
     .select('has_seen_walkthrough, trial_ends_at')

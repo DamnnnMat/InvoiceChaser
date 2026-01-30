@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import './Auth.css'
 
 export default function SignupForm() {
@@ -11,30 +12,64 @@ export default function SignupForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [accessDenied, setAccessDenied] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setAccessDenied(false)
     setLoading(true)
 
     try {
+      // Check allowlist before creating account
+      const checkRes = await fetch('/api/check-allowlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      })
+      const { allowed } = await checkRes.json()
+
+      if (!allowed) {
+        setAccessDenied(true)
+        setLoading(false)
+        return
+      }
+
       const { error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
       })
 
       if (error) throw error
 
-      // Redirect to billing after signup (as per PRD)
-      router.push('/app/billing')
+      router.push('/app/dashboard')
       router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Signup failed')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Signup failed')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
+          <p className="font-medium">Access required</p>
+          <p className="mt-1">
+            InvoiceSeen is currently in private beta. Request access to get an invite.
+          </p>
+        </div>
+        <Button asChild className="w-full">
+          <Link href="/">Request access</Link>
+        </Button>
+        <div className="auth-links">
+          <Link href="/login">Already have an account? Login</Link>
+        </div>
+      </div>
+    )
   }
 
   return (
